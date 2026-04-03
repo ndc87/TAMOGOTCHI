@@ -1,0 +1,368 @@
+# Tamagotchi 2.0 - Additional Files Setup
+
+Run these commands in your project directory (d:\TU HOC JAVA\Tamagotchi):
+
+```batch
+mkdir src\main\java\org\example\dto
+mkdir src\main\java\org\example\controller
+mkdir src\main\resources\static
+```
+
+Then create the following 3 files:
+
+---
+## File 1: src\main\java\org\example\dto\PetStatusResponse.java
+---
+
+```java
+package org.example.dto;
+
+import java.util.List;
+
+public class PetStatusResponse {
+    private String state;
+    private String emoji;
+    private int fullness;
+    private int happiness;
+    private List<String> messages;
+
+    public PetStatusResponse() {}
+
+    public PetStatusResponse(String state, String emoji, int fullness, int happiness, List<String> messages) {
+        this.state = state;
+        this.emoji = emoji;
+        this.fullness = fullness;
+        this.happiness = happiness;
+        this.messages = messages;
+    }
+
+    public String getState() { return state; }
+    public void setState(String state) { this.state = state; }
+
+    public String getEmoji() { return emoji; }
+    public void setEmoji(String emoji) { this.emoji = emoji; }
+
+    public int getFullness() { return fullness; }
+    public void setFullness(int fullness) { this.fullness = fullness; }
+
+    public int getHappiness() { return happiness; }
+    public void setHappiness(int happiness) { this.happiness = happiness; }
+
+    public List<String> getMessages() { return messages; }
+    public void setMessages(List<String> messages) { this.messages = messages; }
+}
+```
+
+---
+## File 2: src\main\java\org\example\controller\PetController.java
+---
+
+```java
+package org.example.controller;
+
+import org.example.context.VirtualPet;
+import org.example.dto.PetStatusResponse;
+import org.example.strategy.FeedStrategy;
+import org.example.strategy.HealStrategy;
+import org.example.strategy.PetStrategy;
+import org.example.strategy.PlayStrategy;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Collections;
+
+@RestController
+@RequestMapping("/api/pet")
+public class PetController {
+
+    private final VirtualPet pet;
+
+    public PetController(VirtualPet pet) {
+        this.pet = pet;
+    }
+
+    @GetMapping("/status")
+    public PetStatusResponse getStatus() {
+        return new PetStatusResponse(
+            pet.getStateName(),
+            pet.getStateEmoji(),
+            pet.getFullness(),
+            pet.getHappiness(),
+            pet.getMessageLog().isEmpty() 
+                ? Collections.singletonList("🏠 Welcome! Your virtual pet is waiting for you!") 
+                : pet.getMessageLog()
+        );
+    }
+
+    @PostMapping("/action")
+    public PetStatusResponse performAction(@RequestParam("actionType") String actionType) {
+        PetStrategy strategy = switch (actionType.toUpperCase()) {
+            case "FEED" -> new FeedStrategy();
+            case "PLAY" -> new PlayStrategy();
+            case "HEAL" -> new HealStrategy();
+            default -> throw new IllegalArgumentException("Unknown action: " + actionType);
+        };
+
+        pet.apply(strategy);
+
+        return new PetStatusResponse(
+            pet.getStateName(),
+            pet.getStateEmoji(),
+            pet.getFullness(),
+            pet.getHappiness(),
+            pet.getMessageLog()
+        );
+    }
+
+    @PostMapping("/reset")
+    public PetStatusResponse resetPet() {
+        pet.reset();
+        return new PetStatusResponse(
+            pet.getStateName(),
+            pet.getStateEmoji(),
+            pet.getFullness(),
+            pet.getHappiness(),
+            pet.getMessageLog()
+        );
+    }
+}
+```
+
+---
+## File 3: src\main\resources\static\index.html
+---
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tamagotchi 2.0 - State & Strategy Pattern Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.8); }
+        }
+        .pet-bounce { animation: bounce 0.5s ease-in-out; }
+        .pet-shake { animation: shake 0.3s ease-in-out 3; }
+        .card-glow { animation: pulse-glow 2s ease-in-out infinite; }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="min-h-screen gradient-bg flex items-center justify-center p-4">
+    <div class="glass-card rounded-3xl shadow-2xl p-8 w-full max-w-md card-glow">
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">
+                🎮 Tamagotchi 2.0
+            </h1>
+            <p class="text-gray-500 text-sm mt-1">State & Strategy Pattern Demo</p>
+        </div>
+
+        <!-- Pet Display -->
+        <div class="text-center mb-6">
+            <div id="pet-emoji" class="text-9xl mb-4 transition-all duration-300">🐶</div>
+            <div id="pet-state" class="inline-block px-4 py-2 rounded-full text-white font-semibold text-lg bg-gradient-to-r from-green-400 to-green-600">
+                HAPPY
+            </div>
+        </div>
+
+        <!-- Stats Bars -->
+        <div class="space-y-4 mb-6">
+            <!-- Fullness Bar -->
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-sm font-medium text-gray-700">🍔 Fullness</span>
+                    <span id="fullness-value" class="text-sm font-bold text-orange-600">100%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                    <div id="fullness-bar" class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-orange-400 to-orange-600" style="width: 100%"></div>
+                </div>
+            </div>
+
+            <!-- Happiness Bar -->
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-sm font-medium text-gray-700">💖 Happiness</span>
+                    <span id="happiness-value" class="text-sm font-bold text-pink-600">100%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                    <div id="happiness-bar" class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-pink-400 to-pink-600" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="grid grid-cols-3 gap-3 mb-6">
+            <button onclick="performAction('FEED')" 
+                    class="flex flex-col items-center justify-center p-4 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 active:scale-95">
+                <span class="text-2xl mb-1">🍔</span>
+                <span class="text-sm">Feed</span>
+            </button>
+            <button onclick="performAction('PLAY')" 
+                    class="flex flex-col items-center justify-center p-4 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 active:scale-95">
+                <span class="text-2xl mb-1">🎾</span>
+                <span class="text-sm">Play</span>
+            </button>
+            <button onclick="performAction('HEAL')" 
+                    class="flex flex-col items-center justify-center p-4 rounded-2xl bg-gradient-to-br from-green-400 to-green-600 text-white font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 active:scale-95">
+                <span class="text-2xl mb-1">💊</span>
+                <span class="text-sm">Heal</span>
+            </button>
+        </div>
+
+        <!-- Message Log -->
+        <div class="bg-gray-50 rounded-2xl p-4 mb-4">
+            <h3 class="text-sm font-semibold text-gray-600 mb-2">📝 Activity Log</h3>
+            <div id="message-log" class="space-y-2 max-h-32 overflow-y-auto text-sm">
+                <p class="text-gray-600">🏠 Welcome! Your virtual pet is waiting for you!</p>
+            </div>
+        </div>
+
+        <!-- Reset Button -->
+        <button onclick="resetPet()" 
+                class="w-full py-2 px-4 rounded-xl bg-gray-200 text-gray-600 font-medium hover:bg-gray-300 transition-colors duration-200">
+            🔄 Reset Pet
+        </button>
+
+        <!-- Pattern Info -->
+        <div class="mt-6 pt-4 border-t border-gray-200">
+            <div class="text-xs text-gray-500 text-center space-y-1">
+                <p><strong>State Pattern:</strong> Pet mood changes based on stats (Happy → Hungry → Sick)</p>
+                <p><strong>Strategy Pattern:</strong> Actions (Feed/Play/Heal) execute different behaviors</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/pet';
+
+        const stateStyles = {
+            'HAPPY': { gradient: 'from-green-400 to-green-600', color: 'text-green-600' },
+            'HUNGRY': { gradient: 'from-yellow-400 to-orange-500', color: 'text-orange-600' },
+            'SICK': { gradient: 'from-red-400 to-red-600', color: 'text-red-600' }
+        };
+
+        document.addEventListener('DOMContentLoaded', fetchStatus);
+
+        async function fetchStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+                updateUI(data);
+            } catch (error) {
+                console.error('Error fetching status:', error);
+                showError('Failed to connect to server');
+            }
+        }
+
+        async function performAction(actionType) {
+            try {
+                const petEmoji = document.getElementById('pet-emoji');
+                petEmoji.classList.add('pet-bounce');
+                
+                const response = await fetch(`${API_BASE}/action?actionType=${actionType}`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) throw new Error('Action failed');
+                
+                const data = await response.json();
+                updateUI(data);
+                
+                setTimeout(() => petEmoji.classList.remove('pet-bounce'), 500);
+            } catch (error) {
+                console.error('Error performing action:', error);
+                showError('Failed to perform action');
+            }
+        }
+
+        async function resetPet() {
+            try {
+                const petEmoji = document.getElementById('pet-emoji');
+                petEmoji.classList.add('pet-shake');
+                
+                const response = await fetch(`${API_BASE}/reset`, { method: 'POST' });
+                const data = await response.json();
+                updateUI(data);
+                
+                setTimeout(() => petEmoji.classList.remove('pet-shake'), 900);
+            } catch (error) {
+                console.error('Error resetting pet:', error);
+                showError('Failed to reset pet');
+            }
+        }
+
+        function updateUI(data) {
+            document.getElementById('pet-emoji').textContent = data.emoji;
+            
+            const stateBadge = document.getElementById('pet-state');
+            const style = stateStyles[data.state] || stateStyles['HAPPY'];
+            stateBadge.textContent = data.state;
+            stateBadge.className = `inline-block px-4 py-2 rounded-full text-white font-semibold text-lg bg-gradient-to-r ${style.gradient}`;
+            
+            document.getElementById('fullness-bar').style.width = `${data.fullness}%`;
+            document.getElementById('fullness-value').textContent = `${data.fullness}%`;
+            
+            const fullnessBar = document.getElementById('fullness-bar');
+            if (data.fullness < 30) {
+                fullnessBar.className = 'h-full rounded-full transition-all duration-500 bg-gradient-to-r from-red-400 to-red-600';
+            } else if (data.fullness < 50) {
+                fullnessBar.className = 'h-full rounded-full transition-all duration-500 bg-gradient-to-r from-yellow-400 to-orange-500';
+            } else {
+                fullnessBar.className = 'h-full rounded-full transition-all duration-500 bg-gradient-to-r from-orange-400 to-orange-600';
+            }
+            
+            document.getElementById('happiness-bar').style.width = `${data.happiness}%`;
+            document.getElementById('happiness-value').textContent = `${data.happiness}%`;
+            
+            const happinessBar = document.getElementById('happiness-bar');
+            if (data.happiness < 30) {
+                happinessBar.className = 'h-full rounded-full transition-all duration-500 bg-gradient-to-r from-red-400 to-red-600';
+            } else if (data.happiness < 50) {
+                happinessBar.className = 'h-full rounded-full transition-all duration-500 bg-gradient-to-r from-yellow-400 to-yellow-500';
+            } else {
+                happinessBar.className = 'h-full rounded-full transition-all duration-500 bg-gradient-to-r from-pink-400 to-pink-600';
+            }
+            
+            const messageLog = document.getElementById('message-log');
+            messageLog.innerHTML = data.messages.map(msg => 
+                `<p class="text-gray-700 py-1 px-2 bg-white rounded-lg shadow-sm">${msg}</p>`
+            ).join('');
+            messageLog.scrollTop = messageLog.scrollHeight;
+        }
+
+        function showError(message) {
+            const messageLog = document.getElementById('message-log');
+            messageLog.innerHTML = `<p class="text-red-600 py-1 px-2 bg-red-50 rounded-lg">❌ ${message}</p>`;
+        }
+    </script>
+</body>
+</html>
+```
+
+---
+
+## To Run the Application:
+
+```batch
+mvn spring-boot:run
+```
+
+Then open http://localhost:8080 in your browser!
